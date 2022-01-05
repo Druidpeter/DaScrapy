@@ -180,3 +180,5 @@ flycheck_*.el
 /network-security.data
 
 
+# Dist Local
+chunk*

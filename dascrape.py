@@ -106,7 +106,9 @@ def main():
         
         print("Refreshing url process list")
 
-        for idx in range(0, min(len(urlProc), batch_size)):
+        endval = min(len(urlProc), batch_size)
+        
+        for idx in range(0, endval-1):
             last_idx = idx
             
             print("Handing off url to parser go-between")

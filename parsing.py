@@ -2,11 +2,14 @@ import subprocess
 import re
 
 from html.parser import HTMLParser
+from db_interface import DB_Interface
 
 usernameRegEx = re.compile(".com/(.+)/(art|journal|status-update)/")
 usernameRegEx_st = re.compile(".com/(.+)/status-update/")
 commentRegEx = re.compile("/[0-9]+/([0-9]+)/$")
 incRegEx = re.compile("-([0-9]+)$")
+
+db = DB_Interface()
 
 class ScrapyParser(HTMLParser):
     def __init__(self):
@@ -43,6 +46,8 @@ class ScrapyParser(HTMLParser):
                 if attr[0] == "href":
                     if usernameRegEx.search(attr[1]) != None:
                         self.outData.append(attr[1])
+                        # if db.check_url(attr[1]) == False:
+                        #     self.outData.append(attr[1])
             
         if tag == "a" or tag == "span":
             self.tagStack.append(tag)
@@ -92,10 +97,5 @@ class ScrapyParser(HTMLParser):
             self.urlType,
             self.gl_inc
         ], self.outData]
-
-        dataLog = open("parsing_log.txt", "a")
-        dataLog.write(' '.join(str(e) for e in returnData[0]))
-        dataLog.write(' '.join(str(e) for e in returnData[1]))
-        dataLog.close()
         
         return (returnData)

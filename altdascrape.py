@@ -60,14 +60,17 @@ def main():
 
         if data == '':
             break
+
+        print(f"counter: {counter}")
         
         if db.check_url(data) == True:
             continue
         
         r_data = parser.proc(data)
-        
+
         print("Handing off row to database go-between.")
         print(f"url: {data}")
+
         db.proc(r_data[0], r_data[1], cnv_date(r_data[2]), r_data[3], r_data[4])
         
 if __name__ == "__main__":

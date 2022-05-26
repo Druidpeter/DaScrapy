@@ -1,175 +1,101 @@
+import sys
+import random
+import time
+
 from html.parser import HTMLParser
+from parsing import URLHarvester, URLParser
+from collections import OrderedDict
 from db_interface import DB_Interface
 
-import parsing
+db = DB_Interface()
 
-MAX_URL_LIST = 4000000 # Four hundred thousands seems about right.
-MAX_BATCH_PROCCED = 50000000 # This value will increase after testing and
-                       # deugging of the code.
-
-PROCLIST_MAX_SIZE = 64000000
-
-procLogFd = open("procced.log", "a")
-
-def sanitize_proc_list(tmp, db):
-    tmp2 = []
-    
-    for i in range(0, len(tmp)):
-        if db.check_url(tmp[i]) == False:
-            tmp2.append(tmp[i])
-        else:
-            continue
-
-    return tmp2
-
-def cnv_date(date):
-    tmp = (date.lower()).split()
-
-    if(tmp[0] == "january"):
-        tmp[0] = "01"
-    elif(tmp[0] == "february"):
-        tmp[0] = "02"
-    elif(tmp[0] == "march"):
-        tmp[0] = "03"
-    elif(tmp[0] == "april"):
-        tmp[0] = "04"
-    elif(tmp[0] == "may"):
-        tmp[0] = "05"
-    elif(tmp[0] == "june"):
-        tmp[0] = "06"
-    elif(tmp[0] == "july"):
-        tmp[0] = "07"
-    elif(tmp[0] == "august"):
-        tmp[0] = "08"
-    elif(tmp[0] == "september"):
-        tmp[0] = "09"
-    elif(tmp[0] == "october"):
-        tmp[0] = "10"
-    elif(tmp[0] == "november"):
-        tmp[0] = "11"
-    elif(tmp[0] == "december"):
-        tmp[0] = "12"
-
-    rdata = tmp[2][0:len(tmp[2])-1] + "-" + \
-            tmp[0] + "-" + \
-            tmp[1][0:len(tmp[1])-1]
-
-    return rdata
-
-def main():
+def main():    
     '''DeviantArt Scraping Algorithm'''
     # Load a list of usernames and their associated profile urls.
 
+    if len(sys.argv) != 2:
+        print("Usage: python3 dascrape.py <userlist>")
+        exit()
+
     print("Loading initial Data.")
+    fileParam = sys.argv[1]
+    initDataFd = open(fileParam, 'r')
+
+    # So! We're going to test and debug the code using the userlist
+    # data saved at 'da-userlist.txt'. However, once we've debugged,
+    # tested, and waterproofed the code moving forward, we need to go
+    # back in with selenium and automate harvesting of username
+    # data. We're really close to finishing the pipeline. Steady as
+    # she goes. :^D
     
-    initDataFd = open('initData.txt', 'r')    
-    urlProc = (initDataFd.readlines())
-    dataProc = []
+    procData = initDataFd.readlines()
 
-    chunkFd = open("chunk.txt", "a+")
+    print("Instantiating parser.")
+    urlHarvester = URLHarvester()
+    urlParser = URLParser()
 
-    print("Instantiating database go-between and parser.")
-    db = DB_Interface()
-    parser = parsing.ScrapyParser()
+    urlPrefix = "https://www.deviantart.com/"
+    urlPostfix = "/gallery/all"
 
-    tmp = []
-    counter = 0
+    urlDataFd = open('urlData.txt', 'a')
+    statLogFd = open('statLog.txt', 'a')
 
-    # 
+    numProcUsers = 0
 
-    batch_size = 500
-    chunkFlag = False
-    exhaustFlag = False
+    
+    for username in procData:
+        urlDataFd.write("Username: " + username + "\n\n")
+        urlDeviations = urlHarvester.proc(urlPrefix + username + urlPostfix)
 
-    print("Entering batch processing loop")
-    total_batch = 0
-
-    while True:
-        if total_batch > MAX_BATCH_PROCCED:
-            print("Url Proc Exhaustion! Refusing to add more urls to urlProc list.")
-            exhaustFlag = True
-            break;
+        # Remove duplicates from urlDeviations
+        tmp = list(OrderedDict.fromkeys(urlDeviations))
+        urlDeviations = []
         
-        for row in dataProc:
-            if len(dataProc) == 0:
-                print("dataproc is empty!")
+        # Remove previously inserted deviations.
+        for u in tmp:
+            if db.check_url(u) == False:
+                urlDeviations.append(u)
+
+                
+        for url in urlDeviations:
+            # Get Complex Delay so as to avoid bot-sniffers.
+            random.seed()
+            delayGen = getComplexDelay()
             
-            print("Handing off row to database go-between.")
-            print(f"url: {row[1]}")
-            db.proc(row[0], row[1], cnv_date(row[2]), row[3], row[4])
-            total_batch += 1
+            urlParser.proc(url)
+            urlDataFd.write(url + "\n")
 
-        dataProc = [] # Reset dataProc to empty list.
-        last_idx = 0
+            print("Next Complex Delay: " + str(next(delayGen)) + " seconds.")
+            time.sleep(next(delayGen))
 
-        last_list_size = 0
+        numProcUsers += 1
+        urlDataFd.write("Num Procced Users: " + str(numProcUsers) + "\n\n")
+
+    urlDataFd.close()
+
+def testComplexDelay():
+    for i in range(1, 1000):
+        tmp = getComplexDelay()
+        print("Next Complex Delay: " + str(next(tmp)) + " seconds.")
+    
+def getComplexDelay(timeBase = 10, timeRes = 10000):
+    while(True):
+        tmp1 = random.randrange(0, timeRes*timeBase)
+        tmp2 = random.randrange(0, timeRes*timeBase)
+
+        for i in range(min(tmp1, tmp2), max(tmp1, tmp2)):
+            tmp3 = random.randrange(0, timeRes*timeBase + 1)
+            tmp4 = random.randrange(0, timeRes*timeBase + 1)
         
-        print("Refreshing url process list")
+            for j in range(min(tmp3, tmp4), max(tmp3, tmp4)):
+                anchor = 0.5*i + 0.5*j
+                r_mod = 0.2 * anchor + 0.8 * random.randrange(0, timeRes*timeBase + 1)
+                r_val = (anchor + (r_mod * random.randrange(-1, 1))) / timeRes
 
-        endval = min(len(urlProc), batch_size)
-        
-        for idx in range(0, endval-1):
-            last_idx = idx
-            
-            print("Handing off url to parser go-between")
-            r_data = parser.proc(urlProc[idx])
-            dataProc.append(r_data[0])
+                if r_val < 0:
+                    r_val *= -1
 
-            r_data[1] = sanitize_proc_list(r_data[1], db)
-            
-            # if len(urlProc) + len(r_data[1]) >= MAX_URL_LIST:
-            #     chunkFlag = True
-                
-            if chunkFlag == True:
-                print("Starting chunk handling of data input.")
-                
-                # fetch data to append from chunkFd.
-                with open("chunk.txt", 'a+') as chunkFd2:
-                    for idx in r_data[1]:
-                        chunkFd2.write(idx + "\n")
-
-                    chunkFd2.seek(0)
-
-                    for j in range(0, batch_size):
-                        line = chunkFd2.readline()
-                        
-                        if(line != ''):
-                            line = line.strip()
-
-                            urlProc.append(line)
-                            procLogFd.write(line)
-
-                    lines = chunkFd2.readlines();
-                            
-                    with open("chunk.txt", 'w') as groomedChunkFd:
-                        ptr = 1
-                        
-                        for line in lines:                            
-                            if ptr > batch_size:
-                                groomedChunkFd.write(line)
-                                ptr += 1
-
-                            if ptr > PROCLIST_MAX_SIZE:
-                                break;
-
-                        groomedChunkFd.close()
-                    chunkFd2.close()
-            else:
-                for e in r_data[1]:
-                        urlProc.append(e)
-                        chunkFd.write(e + "\n")
-                        
-            if last_idx < len(urlProc)-1:
-                urlProc = urlProc[last_idx+1:]
-            else:
-                print("Url proc list has been exhausted. This is highly suspicious. Exit.")
-                # We've run out of urls in the url proc list!!! Exit
-                # and finish.
-
-                logProcFd.close()
-                chunkFd.close()
-                
-                break
-                
+                yield r_val
+    
 if __name__ == "__main__":
     main()

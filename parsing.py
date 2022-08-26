@@ -4,6 +4,8 @@ import re
 from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
 
+from selenium.common.exceptions import WebDriverException
+
 from html.parser import HTMLParser
 from db_interface import DB_Interface
 from harvester import HarvestDeviationHTML, HarvestGalleryHTML
@@ -14,40 +16,6 @@ commentRegEx = re.compile("/[0-9]+/([0-9]+)/$")
 incRegEx = re.compile("-([0-9]+)$")
 
 driver = webdriver.Firefox()
-
-def cnv_date(date):
-    tmp = (date.lower()).split()
-
-    if(tmp[0] == "january"):
-        tmp[0] = "01"
-    elif(tmp[0] == "february"):
-        tmp[0] = "02"
-    elif(tmp[0] == "march"):
-        tmp[0] = "03"
-    elif(tmp[0] == "april"):
-        tmp[0] = "04"
-    elif(tmp[0] == "may"):
-        tmp[0] = "05"
-    elif(tmp[0] == "june"):
-        tmp[0] = "06"
-    elif(tmp[0] == "july"):
-        tmp[0] = "07"
-    elif(tmp[0] == "august"):
-        tmp[0] = "08"
-    elif(tmp[0] == "september"):
-        tmp[0] = "09"
-    elif(tmp[0] == "october"):
-        tmp[0] = "10"
-    elif(tmp[0] == "november"):
-        tmp[0] = "11"
-    elif(tmp[0] == "december"):
-        tmp[0] = "12"
-
-    rdata = tmp[2][0:len(tmp[2])-1] + "-" + \
-            tmp[0] + "-" + \
-            tmp[1][0:len(tmp[1])-1]
-
-    return rdata
 
 db = DB_Interface()
 
@@ -77,9 +45,12 @@ class URLParser(HTMLParser):
 
         if tag == "time" and enclosing_tag == "span":
             for attr in attrs:
-                self.pageDate = (attr[1].split("T", 1))[0]
-                self.proc_complete = True
-                break
+                if attr[0] == "datetime":
+                    td = (attr[1].split("T", 1))
+                    td[1] = td[1][:8]
+                    self.pageDate = td[0] + " " + td[1]
+                    self.proc_complete = True
+                    break
 
         if tag == "a" or tag == "span":
             self.tagStack.append(tag)
@@ -138,7 +109,7 @@ class URLParser(HTMLParser):
         if(self.urlType != False and db.check_url(self.pageUrl) == False):
             print("Inserting into Database: " + self.pageUrl)
             
-            db.proc(self.username, self.pageUrl, cnv_date(self.pageDate),
+            db.proc(self.username, self.pageUrl, self.pageDate,
                     self.urlType, self.gl_inc)
             
 class URLHarvester(HTMLParser):
@@ -173,9 +144,7 @@ class URLHarvester(HTMLParser):
             
     def proc(self, url):        
         # Selenium Generator injection point.
-        htmlDataGen = HarvestGalleryHTML(url, driver)
-        htmlData = next(htmlDataGen)
-
+        htmlData = HarvestGalleryHTML(url, driver)
         print(htmlData)
 
         # Parsing using HTMLParser derived objects is now depreciated.
@@ -183,13 +152,4 @@ class URLHarvester(HTMLParser):
         # HarvestGalleryHTML now directly returns the urls as a list.
         # self.feed(htmlData)
         
-        while(True):
-            # Feed from Generator in Multiple Loops until Exhaustion
-            tmp = next(htmlDataGen)
-
-            if(tmp == -1):
-                break
-            else:
-                htmlData.extend(tmp)
-
         return htmlData

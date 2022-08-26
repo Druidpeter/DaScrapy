@@ -20,13 +20,6 @@ def main():
     print("Loading initial Data.")
     fileParam = sys.argv[1]
     initDataFd = open(fileParam, 'r')
-
-    # So! We're going to test and debug the code using the userlist
-    # data saved at 'da-userlist.txt'. However, once we've debugged,
-    # tested, and waterproofed the code moving forward, we need to go
-    # back in with selenium and automate harvesting of username
-    # data. We're really close to finishing the pipeline. Steady as
-    # she goes. :^D
     
     procData = initDataFd.readlines()
 
@@ -37,8 +30,8 @@ def main():
     urlPrefix = "https://www.deviantart.com/"
     urlPostfix = "/gallery/all"
 
-    urlDataFd = open('urlData.txt', 'a')
-    statLogFd = open('statLog.txt', 'a')
+    urlDataFd = open('lists/urlData.txt', 'a')
+    statLogFd = open('lists/statLog.txt', 'a')
 
     numProcUsers = 0
 

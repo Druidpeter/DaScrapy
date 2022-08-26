@@ -181,5 +181,8 @@ flycheck_*.el
 
 
 # Dist Local
-chunk*
-initData.txt
+lists/**
+log/**
+Graphs/**
+DBvs
+DBvs/**
